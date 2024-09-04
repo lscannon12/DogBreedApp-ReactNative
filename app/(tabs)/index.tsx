@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
+  View
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -62,12 +63,14 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TextInput
-        style={styles.searchBar}
-        placeholder="Search for a breed..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchBar}
+          placeholder="Search for a breed..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
       <FlatList
         data={filteredBreeds}
         keyExtractor={(item) => item.name}
@@ -93,6 +96,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
   },
+  searchContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   titleContainer: {
     paddingVertical: 16,
     alignItems: 'center',
@@ -108,6 +115,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 8,
     marginBottom: 16,
+    width: '80%'
   },
   breedContainer: {
     flexDirection: 'row',
