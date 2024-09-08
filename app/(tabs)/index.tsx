@@ -7,45 +7,67 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
-  View
+  View,
+  Text
 } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 
 interface Breed {
   name: string;
   imageUrl: string;
+  temperament?: string;
 }
 
 export default function HomeScreen() {
   const [dogBreeds, setDogBreeds] = useState<Breed[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchDogBreeds() {
+    const fetchData = async () => {
       try {
-        const response = await fetch('https://dog.ceo/api/breeds/list/all');
-        const data = await response.json();
-        const breedNames = Object.keys(data.message);
+        const temperamentResponse = await fetch('https://api.thedogapi.com/v1/breeds');
+        if (!temperamentResponse.ok) throw new Error('Failed to fetch temperaments');
+        const temperamentData = await temperamentResponse.json();
 
-        const breedsWithImages = await Promise.all(
-          breedNames.map(async (breed) => {
-            const breedImageResponse = await fetch(`https://dog.ceo/api/breed/${breed}/images/random`);
+        const breedsWithTemperaments = temperamentData.map((breed: any) => ({
+          name: breed.name || 'Unknown',
+          temperament: breed.temperament || 'No temperament info',
+        }));
+
+        const breedsWithImagesPromises = breedsWithTemperaments.map(async (breed) => {
+          try {
+            const breedImageResponse = await fetch(`https://dog.ceo/api/breed/${breed.name.toLowerCase()}/images/random`);
+            if (!breedImageResponse.ok) throw new Error('Failed to fetch breed image');
             const imageData = await breedImageResponse.json();
-            return { name: breed, imageUrl: imageData.message };
-          })
-        );
+            return {
+              name: breed.name,
+              imageUrl: imageData.message
+            };
+          } catch {
+            return null;
+          }
+        });
 
-        setDogBreeds(breedsWithImages);
+        const breedsWithImages = (await Promise.all(breedsWithImagesPromises)).filter(imageData => imageData !== null) as Breed[];
+
+        const combinedBreeds = breedsWithTemperaments
+          .filter(breed => breedsWithImages.some(imgBreed => imgBreed.name.toLowerCase() === breed.name.toLowerCase()))
+          .map(breed => ({
+            ...breed,
+            imageUrl: breedsWithImages.find(imgBreed => imgBreed.name.toLowerCase() === breed.name.toLowerCase())?.imageUrl || 'https://via.placeholder.com/50?text=Image+Not+Found',
+          }));
+
+        setDogBreeds(combinedBreeds);
       } catch (error) {
-        console.error('Error fetching dog breeds:', error);
+        setError('Error fetching data');
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
-    fetchDogBreeds();
+    fetchData();
   }, []);
 
   const filteredBreeds = dogBreeds.filter((breed) =>
@@ -56,7 +78,15 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
-        <ThemedText>Loading Dog Breeds...</ThemedText>
+        <Text>Loading Dog Breeds...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <Text>{error}</Text>
       </SafeAreaView>
     );
   }
@@ -75,15 +105,18 @@ export default function HomeScreen() {
         data={filteredBreeds}
         keyExtractor={(item) => item.name}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.breedContainer} onPress={() => console.log(item.name)}>
+          <TouchableOpacity style={styles.breedContainer}>
             <Image source={{ uri: item.imageUrl }} style={styles.breedImage} />
-            <ThemedText style={styles.breedName}>{item.name}</ThemedText>
+            <View>
+              <Text style={styles.breedName}>{item.name}</Text>
+              <Text style={styles.breedTemperament}>Temperament: {item.temperament}</Text>
+            </View>
           </TouchableOpacity>
         )}
         ListHeaderComponent={
-          <ThemedView style={styles.titleContainer}>
-            <ThemedText type="title">Welcome to Dog Breeds!</ThemedText>
-          </ThemedView>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Welcome to Dog Breeds!</Text>
+          </View>
         }
         contentContainerStyle={styles.listContent}
       />
@@ -135,5 +168,13 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 16,
+  },
+  breedTemperament: {
+    fontSize: 14,
+    color: '#666',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
 });
